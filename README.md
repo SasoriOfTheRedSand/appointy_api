@@ -7,24 +7,26 @@ Meetings should have the following Attributes. All fields are mandatory unless m
   * Start Time
   * End Time
   * Creation Timestamp
+
 Participants should have the following Attributes. All fields are mandatory unless marked optional:
   * Name
   * Email
   * RSVP (i.e. Yes/No/MayBe/Not Answered)  
+
 You are required to Design and Develop an HTTP JSON API capable of the following operations,
-Schedule a meeting
-  * Should be a POST request
-  * Use JSON request body URL should be ‘/meetings’
-  * Must return the meeting in JSON format
-Get a meeting using id
-  * Should be a GET request
-  * Id should be in the url parameter URL should be ‘/meeting/&lt;id here>’
-  * Must return the meeting in JSON format
-List all meetings within a time frame
-  * Should be a GET request
-  * URL should be ‘/meetings?start=&lt;start time here>&amp;end=&lt;end time here>’
-  * Must return a an array of meetings in JSON format that are within the time range
-List all meetings of a participant
-  * Should be a GET request
-  * URL should be ‘/meetings?participant=&lt;email id>’
-  * Must return a an array of meetings in JSON format that have the participant received in the email within the time range
+  * Schedule a meeting
+    * Should be a POST request
+    * Use JSON request body URL should be ‘/meetings’
+    * Must return the meeting in JSON format
+  Get a meeting using id
+    * Should be a GET request
+    * Id should be in the url parameter URL should be ‘/meeting/&lt;id here>’
+    * Must return the meeting in JSON format
+  List all meetings within a time frame
+    * Should be a GET request
+    * URL should be ‘/meetings?start=&lt;start time here>&amp;end=&lt;end time here>’
+    * Must return a an array of meetings in JSON format that are within the time range
+  List all meetings of a participant
+    * Should be a GET request
+    * URL should be ‘/meetings?participant=&lt;email id>’
+    * Must return a an array of meetings in JSON format that have the participant received in the email within the time range
