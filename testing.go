@@ -94,7 +94,7 @@ func TestListMeetingTimeFrame(t *testing.T) {
 }
 
 func TestListMeetingTimeFrameNotFound(t *testing.T) {
-	req, err := http.NewRequest("GET", "/meeting", nil)
+	req, err := http.NewRequest("GET", "/meeting/{start_time}{end_time}", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestListMeetingParticipant(t *testing.T) {
 }
 
 func TestListMeetingParticipantNotFound(t *testing.T) {
-  req, err := http.NewRequest("GET", "/meeting", nil)
+  req, err := http.NewRequest("GET", "/meeting/{email}/id", nil)
   if err != nil {
     t.Fatal(err)
   }
