@@ -2,9 +2,9 @@ package main
 
 import (
         "context"
-//        "encoding/json"
+        "encoding/json"
         "fmt"
-//        "log"
+       "log"
         "net/http"
         "time"
 //      	"go.mongodb.org/mongo-driver/bson"
@@ -24,16 +24,45 @@ type Participant struct {
 type Meeting struct {
   ID                  primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
   Titile              string             `json:"title,omitempty" bson:"title,omitempty"`
-  Participant
-  Start_Time          int                `json:"start_time,omitempty" bson:"start_time,omitempty"`
-  End_Time            int                `json:"end_time,omitempty" bson:"end_time,omitempty"`
-  Creation_Timestamp  int                `json:"creation_timestamp,omitempty" bson:"creation_timestamp,omitempty"`
+  Participant         []Participant      `json:"participant" bson:"participant"`
+  Start_Time          string             `json:"start_time,omitempty" bson:"start_time,omitempty"`
+  End_Time            string             `json:"end_time,omitempty" bson:"end_time,omitempty"`
+  Creation_Timestamp  string             `json:"creation_timestamp,omitempty" bson:"creation_timestamp,omitempty"`
 }
 
-func CreateMeetingEndpoint(response http.ResponseWriter, request *http.Request) {}
-func GetMeetingID(response http.ResponseWriter, request *http.Request) {}
-func GetMeetingTimeFrame(response http.ResponseWriter, request *http.Request) {}
-func GetMeetingParticipant(response http.ResponseWriter, request *http.Request) {}
+func CreateMeetingEndpoint(response http.ResponseWriter, request *http.Request) {
+  response.Header().Set("content-type", "application/json")
+  var meeting Meeting
+  _ = json.NewDecoder(request.Body).Decode(&meeting)
+  collection := client.Database("markiv").Collection("meeting")
+  ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	result, _ := collection.InsertOne(ctx, meeting)
+	json.NewEncoder(response).Encode(result)
+}
+
+func GetMeetingID(response http.ResponseWriter, request *http.Request) {
+  response.Header().Set("content-type", "application/json")
+	params := mux.Vars(request)
+	id, _ := primitive.ObjectIDFromHex(params["id"])
+	var meeting Meeting
+	collection := client.Database("markiv").Collection("meeting")
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	err := collection.FindOne(ctx, Meeting{ID: id}).Decode(&meeting)
+	if err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{ "message": "` + err.Error() + `" }`))
+		return
+	}
+	json.NewEncoder(response).Encode(meeting)
+}
+
+func ListMeetingTimeFrame(response http.ResponseWriter, request *http.Request) {
+
+}
+
+func ListMeetingParticipant(response http.ResponseWriter, request *http.Request) {
+
+}
 
 
 func main () {
@@ -45,8 +74,8 @@ func main () {
 //  mux := http.NewServerMux()
   http.HandleFunc("/meeting", CreateMeetingEndpoint)
   http.HandleFunc("/meeting/{ID}", GetMeetingID)
-  http.HandleFunc("/meeting/{Start_Time}{End_Time}", GetMeetingTimeFrame)
-  http.HandleFunc("/meeting/{Participant}", GetMeetingParticipant)
+  http.HandleFunc("/meeting/{Start_Time}{End_Time}/{ID}", ListMeetingTimeFrame)
+  http.HandleFunc("/meeting/{email}/{ID}", ListMeetingParticipant)
 
   http.ListenAndServe(":8080",nil)
 }
