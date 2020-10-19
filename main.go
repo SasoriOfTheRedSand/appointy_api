@@ -126,6 +126,7 @@ func CreateMeetingEndpoint(response http.ResponseWriter, request *http.Request) 
 		response.Write([]byte(`{ "message": "Invalid time" }`))
 		return
 	}
+  
 	lock.Lock()
 	defer lock.Unlock()
 	err := ParticipantsBusy(meet)
