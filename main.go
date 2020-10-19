@@ -4,10 +4,14 @@ import (
         "context"
         "encoding/json"
         "fmt"
+        "strconv"
+        "errors"
+        "path"
+        "sync"
 //       "log"
         "net/http"
         "time"
-//      	"go.mongodb.org/mongo-driver/bson"
+      	"go.mongodb.org/mongo-driver/bson"
       	"go.mongodb.org/mongo-driver/bson/primitive"
       	"go.mongodb.org/mongo-driver/mongo"
         "go.mongodb.org/mongo-driver/mongo/options"
@@ -32,14 +36,14 @@ type Participant struct {
 
 type Meeting struct {
   ID                  primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
-  Titile              string             `json:"title,omitempty" bson:"title,omitempty"`
+  Title               string             `json:"title,omitempty" bson:"title,omitempty"`
   Participants         []Participant      `json:"participants" bson:"participants"`
   Start_Time          string             `json:"start_time,omitempty" bson:"start_time,omitempty"`
   End_Time            string             `json:"end_time,omitempty" bson:"end_time,omitempty"`
   Creation_Timestamp  string             `json:"creation_timestamp,omitempty" bson:"creation_timestamp,omitempty"`
 }
 
-func (person *participant) cons() {
+func (person *Participant) cons() {
 	if person.RSVP == "" {
 		person.RSVP = "Not Answered"
 	}
@@ -86,7 +90,7 @@ func ParticipantsBusy(thismeet Meeting) error {
 	defer cancel()
 	var meet Meeting
 	for _, thisperson := range thismeet.Participants {
-		if thisperson.RSVP lock sync.Mutex == "Yes" {
+//		if thisperson.RSVP lock sync.Mutex == "Yes" {
 			filter := bson.M{
 				"participants.email": thisperson.Email,
 				"participants.rsvp":  "Yes",
@@ -102,8 +106,8 @@ func ParticipantsBusy(thismeet Meeting) error {
 				}
 			}
 		}
-	}
-	return nil
+    return nil
+//	}
 }
 
 
@@ -130,7 +134,7 @@ func CreateMeetingEndpoint(response http.ResponseWriter, request *http.Request) 
 		response.Write([]byte(`{ "message": "` + err.Error() + `" }`))
 		return
 	}
-	collection := client.Database("markiv").Collection("meetings")
+	collection := client.Database("markiv").Collection("meeting")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	result, _ := collection.InsertOne(ctx, meet)
@@ -139,20 +143,33 @@ func CreateMeetingEndpoint(response http.ResponseWriter, request *http.Request) 
 	fmt.Println(meet)
 }
 
-func GetMeetingID(response http.ResponseWriter, request *http.Request) {
-  response.Header().Set("content-type", "application/json")
-	params := mux.Vars(request)
-	id, _ := primitive.ObjectIDFromHex(params["id"])
-	var meeting Meeting
+
+func CheckMeetingwithID(id primitive.ObjectID) (Meeting, error) {
+	var meet Meeting
 	collection := client.Database("markiv").Collection("meeting")
-	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	err := collection.FindOne(ctx, Meeting{ID: id}).Decode(&meeting)
-	if err != nil {
-		response.WriteHeader(http.StatusInternalServerError)
-		response.Write([]byte(`{ "message": "` + err.Error() + `" }`))
-		return
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	err := collection.FindOne(ctx, Meeting{ID: id}).Decode(&meet)
+	if meet.ID != id {
+		err = errors.New("Error 400: ID not present")
 	}
-	json.NewEncoder(response).Encode(meeting)
+	return meet, err
+}
+
+
+func GetMeetingID(response http.ResponseWriter, request *http.Request) {
+	if request.Method == "GET" {
+		response.Header().Set("content-type", "application/json")
+		fmt.Println(path.Base(request.URL.Path))
+		id, _ := primitive.ObjectIDFromHex(path.Base(request.URL.Path))
+		meetingwithID, err := CheckMeetingwithID(id)
+		if err != nil {
+			response.WriteHeader(http.StatusBadRequest)
+			response.Write([]byte(`{ "message": "` + err.Error() + `" }`))
+			return
+		}
+		json.NewEncoder(response).Encode(meetingwithID)
+	}
 }
 
 func CheckMeetingWithTime(CheckStartTime string, CheckEndTime string) []Meeting {
@@ -247,7 +264,7 @@ func main () {
 	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
 	client, _ = mongo.Connect(ctx, clientOptions)
 //  mux := http.NewServerMux()
-  http.HandleFunc("/meetings", CreateMeetingEndpoint)
+  http.HandleFunc("/meetings", MeetingHandler)
   http.HandleFunc("/meeting/", GetMeetingID)
   http.HandleFunc("/participants/", ListMeetingParticipant)
 
