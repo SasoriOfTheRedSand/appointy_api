@@ -4,7 +4,7 @@ import (
         "context"
         "encoding/json"
         "fmt"
-       "log"
+//       "log"
         "net/http"
         "time"
 //      	"go.mongodb.org/mongo-driver/bson"
@@ -14,6 +14,8 @@ import (
 )
 
 var client *mongo.Client
+
+var lock sync.Mutex
 
 var Defaultskip = int64(0)
 
@@ -31,15 +33,15 @@ type Participant struct {
 type Meeting struct {
   ID                  primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
   Titile              string             `json:"title,omitempty" bson:"title,omitempty"`
-  Participants         []Participant      `json:"participant" bson:"participant"`
+  Participants         []Participant      `json:"participants" bson:"participants"`
   Start_Time          string             `json:"start_time,omitempty" bson:"start_time,omitempty"`
   End_Time            string             `json:"end_time,omitempty" bson:"end_time,omitempty"`
   Creation_Timestamp  string             `json:"creation_timestamp,omitempty" bson:"creation_timestamp,omitempty"`
 }
 
 func (person *participant) cons() {
-	if person.Rsvp == "" {
-		person.Rsvp = "Not Answered"
+	if person.RSVP == "" {
+		person.RSVP = "Not Answered"
 	}
 	if person.Email == "" {
 		person.Email = "defaultmail@email.com"
@@ -53,14 +55,14 @@ func (obj *Meeting) def() {
 	if obj.Title == "" {
 		obj.Title = "Untitled Meeting"
 	}
-	if obj.Starttime == "" {
-		obj.Starttime = string(time.Now().Format(time.RFC3339))
+	if obj.Start_Time == "" {
+		obj.Start_Time = string(time.Now().Format(time.RFC3339))
 	}
-	if obj.Endtime == "" {
-		obj.Endtime = string(time.Now().Local().Add(time.Hour * time.Duration(1)).Format(time.RFC3339))
+	if obj.End_Time == "" {
+		obj.End_Time = string(time.Now().Local().Add(time.Hour * time.Duration(1)).Format(time.RFC3339))
 	}
-	if obj.Creationtime == "" {
-		obj.Creationtime = string(time.Now().Format(time.RFC3339))
+	if obj.Creation_Timestamp == "" {
+		obj.Creation_Timestamp = string(time.Now().Format(time.RFC3339))
 	}
 	for i := range obj.Participants {
 		obj.Participants[i].cons()
@@ -84,17 +86,17 @@ func ParticipantsBusy(thismeet Meeting) error {
 	defer cancel()
 	var meet Meeting
 	for _, thisperson := range thismeet.Participants {
-		if thisperson.Rsvp == "Yes" {
+		if thisperson.RSVP lock sync.Mutex == "Yes" {
 			filter := bson.M{
 				"participants.email": thisperson.Email,
 				"participants.rsvp":  "Yes",
-				"endtime":            bson.M{"$gt": string(time.Now().Format(time.RFC3339))},
+				"end_time":            bson.M{"$gt": string(time.Now().Format(time.RFC3339))},
 			}
 			cursor, _ := collection.Find(ctx, filter)
 			for cursor.Next(ctx) {
 				cursor.Decode(&meet)
-				if (thismeet.Starttime >= meet.Starttime && thismeet.Starttime <= meet.Endtime) ||
-					(thismeet.Endtime >= meet.Starttime && thismeet.Endtime <= meet.Endtime) {
+				if (thismeet.Start_Time >= meet.Start_Time && thismeet.Start_Time <= meet.End_Time) ||
+					(thismeet.End_Time >= meet.Start_Time && thismeet.End_Time <= meet.End_Time) {
 					returnerror := "Error 400: Participant " + thisperson.Name + " RSVP Clash"
 					return errors.New(returnerror)
 				}
@@ -110,12 +112,12 @@ func CreateMeetingEndpoint(response http.ResponseWriter, request *http.Request) 
 	var meet Meeting
 	_ = json.NewDecoder(request.Body).Decode(&meet)
 	meet.def()
-	if meet.Starttime < meet.Creationtime {
+	if meet.Start_Time < meet.Creation_Timestamp {
 		response.WriteHeader(http.StatusBadRequest)
 		response.Write([]byte(`{ "message": "Meeting cannot start in the past" }`))
 		return
 	}
-	if meet.Starttime > meet.Endtime {
+	if meet.Start_Time > meet.End_Time {
 		response.WriteHeader(http.StatusBadRequest)
 		response.Write([]byte(`{ "message": "Invalid time" }`))
 		return
@@ -153,12 +155,12 @@ func GetMeetingID(response http.ResponseWriter, request *http.Request) {
 	json.NewEncoder(response).Encode(meeting)
 }
 
-func CheckMeetingByTime(CheckStartTime string, CheckEndTime string) []Meeting {
+func CheckMeetingWithTime(CheckStartTime string, CheckEndTime string) []Meeting {
 	collection := client.Database("markiv").Collection("meeting")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	opts := options.Find()
-	opts.SetSort(bson.D{{Key: "starttime", Value: 1}})
+	opts.SetSort(bson.D{{Key: "start_time", Value: 1}})
 	opts.Skip = &skip
 	opts.Limit = &limit
 	filter := bson.D{
@@ -188,7 +190,7 @@ func ListMeetingTimeFrame(response http.ResponseWriter, request *http.Request) {
 	if len(request.URL.Query()["ofset"]) != 0 {
 		skip, _ = strconv.ParseInt(request.URL.Query()["offset"][0], 0, 64)
 	}
-	meetingswithtime := CheckMeetingByTime(CheckStartTime, CheckEndTime)
+	meetingswithtime := CheckMeetingWithTime(CheckStartTime, CheckEndTime)
 	json.NewEncoder(response).Encode(meetingswithtime)
 	skip = Defaultskip
 	limit = Defaultlimit
@@ -199,7 +201,7 @@ func CheckParticipant(email string) []Meeting {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	opts := options.Find()
-	opts.SetSort(bson.D{{Key: "starttime", Value: 1}})
+	opts.SetSort(bson.D{{Key: "start_time", Value: 1}})
 	opts.Skip = &skip
 	opts.Limit = &limit
 	cursor, _ := collection.Find(ctx, bson.D{
