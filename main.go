@@ -61,7 +61,28 @@ func ListMeetingTimeFrame(response http.ResponseWriter, request *http.Request) {
 }
 
 func ListMeetingParticipant(response http.ResponseWriter, request *http.Request) {
-
+  response.Header().Set("content-type", "application/json")
+	var meeting []Meetings
+	collection := client.Database("thepolyglotdeveloper").Collection("meeting")
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	cursor, err := collection.Find(ctx, bson.M{})
+	if err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{ "message": "` + err.Error() + `" }`))
+		return
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx) {
+		var meeting Meeting
+		cursor.Decode(&meeting)
+		people = append(meeting, meeting)
+	}
+	if err := cursor.Err(); err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		response.Write([]byte(`{ "message": "` + err.Error() + `" }`))
+		return
+	}
+	json.NewEncoder(response).Encode(meeting)
 }
 
 
